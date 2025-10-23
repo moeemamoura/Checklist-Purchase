@@ -19,12 +19,13 @@ import { ItemStorage, itemsStorage } from "@/storage/itemsStorage"
 
 const FILTER_STATUS: FilterStatus[] = [FilterStatus.PEDING, FilterStatus.DONE]
 
+
 export function Home(){
   const [filter, setFilter] = useState(FilterStatus.PEDING)
   const [description, setDescription] = useState("")
   const [items, setItems] = useState<ItemStorage[]>([])
 
-  function handleAdd(){
+  async function handleAdd(){
     if(!description.trim()){
       return Alert.alert("Adicionar", "Informe a descricao para adicionar")
     }
@@ -34,19 +35,75 @@ export function Home(){
       status: FilterStatus.PEDING,
     }
   
-    setItems((prevState) => [...prevState, newItem])
+    await itemsStorage.add(newItem)
+    await ItemsByStatus()
+
+    setDescription("")
+    setFilter(FilterStatus.PEDING)
   }
+
+  async function ItemsByStatus() {
+    try {
+      const response = await itemsStorage.getByStatus(filter)
+      setItems(response)
+    } catch (error){
+      Alert.alert("Erro", "Nao foi possivel filtrar os itens.")
+    }
+  }
+
+  async function handleRemove(id:string) {
+    try {
+      await itemsStorage.remove(id)
+      await ItemsByStatus()
+    } catch (error) {
+      console.log(error)
+      Alert.alert("Remover", "nao foi possivel remover.")
+    }
+  }
+
+  function handleClear() {
+    Alert.alert("Limpar", "Deseja remover todos?", [
+      { text: "Nao", style:"cancel"},
+      { text: "Sim", onPress: () => OnClear()}
+    ])
+  }
+
+  async function OnClear() {
+    try {
+      await itemsStorage.clear()
+      setItems([])
+
+    } catch (error) {
+      console.log(error)
+      Alert.alert("Erro", "nao foi possivel remover todos os itens.")
+    }
+  }
+
+  async function HandleToggleItemsStatus(id: string) {
+    try {
+      await itemsStorage.toggleStatus(id)
+      await ItemsByStatus()
+
+    } catch (error) {
+      console.log(error)
+      Alert.alert("Erro", "Nao foi possivel atualizar o status.")
+    }
+  }
+
   useEffect(() => {
-    itemsStorage.get().then((response) => console.log(response))
-  }, [])
-  
+    ItemsByStatus()
+  }, [filter])
+
   return (
     <View style={styles.container}> 
       <Image source={require("@/assets/logo.png")} style={styles.logo}/>
 
         <View style={styles.form}>
-          <Input placeholder="O que voce quer comprar?"
-          onChangeText={setDescription}/>
+          <Input 
+            placeholder="O que voce quer comprar?"
+            onChangeText={setDescription}
+            value={description}
+          />
           <Button title="Adicionar" onPress={handleAdd}/>
         </View>
 
@@ -61,7 +118,7 @@ export function Home(){
             />
           )}
 
-          <TouchableOpacity style={styles.clearButton}>
+          <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
             <Text style={styles.clearText}>Limpar</Text>
           </TouchableOpacity>
         </View>
@@ -72,8 +129,8 @@ export function Home(){
           renderItem={({ item }) => (
             <Item 
               data={item}
-              onRemove={() => console.log("rempvehyhgu")}
-              onStatus={() => console.log("deu")}
+              onRemove={() => handleRemove(item.id)}
+              onStatus={() => HandleToggleItemsStatus(item.id)}
               />
           )}
           showsHorizontalScrollIndicator={false}
